@@ -44,7 +44,7 @@ function App() {
                     }
                 />
 
-                {/* ✅ NEW BOOKINGS ROUTE */}
+                {/* NEW BOOKINGS ROUTE */}
                 <Route
                     path="/bookings"
                     element={

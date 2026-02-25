@@ -4,33 +4,38 @@ import {
     createResource,
     deleteResource,
 } from '../services/resourceService';
+import { getDepartments } from '../services/authService';
 import { Link } from 'react-router-dom';
 import RoleBased from '../components/RoleBased';
 
+const initialNewResource = {
+    name: '',
+    type: 'ROOM',
+    departmentName: '',
+    floorName: '',
+    capacity: 1,
+    features: '',
+    deskMode: 'HOT_DESK',
+};
+
 const Resources = () => {
     const [resources, setResources] = useState([]);
+    const [departments, setDepartments] = useState([]);
+    const [createMessage, setCreateMessage] = useState({ text: '', type: '' });
     const [filters, setFilters] = useState({
         type: '',
-        floorId: '',
-        departmentId: '',
+        floorName: '',
+        departmentName: '',
         capacity: '',
         features: '',
     });
-    const [newResource, setNewResource] = useState({
-        name: '',
-        type: 'ROOM',
-        departmentId: 1,
-        floorId: 1,
-        capacity: 1,
-        features: [],
-        deskMode: 'HOT_DESK',
-    });
+    const [newResource, setNewResource] = useState(initialNewResource);
 
     const fetchResources = async () => {
         const params = {
             type: filters.type || undefined,
-            floorId: filters.floorId || undefined,
-            departmentId: filters.departmentId || undefined,
+            floorName: filters.floorName || undefined,
+            departmentName: filters.departmentName || undefined,
             capacity: filters.capacity || undefined,
             features: filters.features
                 ? filters.features.split(',').map((f) => f.trim())
@@ -38,19 +43,46 @@ const Resources = () => {
         };
 
         const res = await getResources(params);
-        setResources(res.data);
+        setResources(Array.isArray(res?.data) ? res.data : []);
     };
 
     useEffect(() => {
         fetchResources();
+
+        const fetchDepartments = async () => {
+            try {
+                const res = await getDepartments();
+                setDepartments(Array.isArray(res?.data) ? res.data : []);
+            } catch {
+                setDepartments([]);
+            }
+        };
+
+        fetchDepartments();
     }, []);
 
     const handleCreate = async () => {
-        await createResource({
-            ...newResource,
-            features: newResource.features.split(','),
-        });
-        fetchResources();
+        setCreateMessage({ text: '', type: '' });
+        try {
+            await createResource({
+                ...newResource,
+                features: newResource.features
+                    .split(',')
+                    .map((feature) => feature.trim())
+                    .filter(Boolean),
+            });
+            setCreateMessage({
+                text: 'Resource created successfully!',
+                type: 'success',
+            });
+            setNewResource(initialNewResource);
+            fetchResources();
+        } catch (err) {
+            setCreateMessage({
+                text: err.response?.data?.error || 'Create resource failed',
+                type: 'error',
+            });
+        }
     };
 
     const handleDelete = async (id) => {
@@ -80,23 +112,26 @@ const Resources = () => {
 
                 {/* Floor */}
                 <input
-                    type="number"
-                    placeholder="Floor ID"
+                    type="text"
+                    placeholder="Floor Name"
                     className="border p-2"
-                    value={filters.floorId}
+                    value={filters.floorName}
                     onChange={(e) =>
-                        setFilters({ ...filters, floorId: e.target.value })
+                        setFilters({ ...filters, floorName: e.target.value })
                     }
                 />
 
                 {/* Department */}
                 <input
-                    type="number"
-                    placeholder="Department ID"
+                    type="text"
+                    placeholder="Department Name"
                     className="border p-2"
-                    value={filters.departmentId}
+                    value={filters.departmentName}
                     onChange={(e) =>
-                        setFilters({ ...filters, departmentId: e.target.value })
+                        setFilters({
+                            ...filters,
+                            departmentName: e.target.value,
+                        })
                     }
                 />
 
@@ -127,12 +162,25 @@ const Resources = () => {
                 >
                     Search
                 </button>
-                {/* Create Resource (Admin Only) */}
-                <RoleBased roles={['SYSTEM_ADMIN', 'DEPARTMENT_ADMIN']}>
+            </div>
+            {/* Create Resource (System Admin Only) */}
+                <RoleBased roles={['SYSTEM_ADMIN']}>
                     <div className="border p-4 mb-6 rounded bg-gray-50">
                         <h2 className="font-bold mb-4 text-lg">
                             Create Resource
                         </h2>
+
+                        {createMessage.text && (
+                            <p
+                                className={`mb-3 font-medium ${
+                                    createMessage.type === 'success'
+                                        ? 'text-green-600'
+                                        : 'text-red-600'
+                                }`}
+                            >
+                                {createMessage.text}
+                            </p>
+                        )}
 
                         <div className="grid grid-cols-2 gap-3">
                             {/* Name */}
@@ -165,29 +213,36 @@ const Resources = () => {
                             </select>
 
                             {/* Department */}
-                            <input
-                                type="number"
-                                placeholder="Department ID"
-                                className="border p-2"
-                                value={newResource.departmentId}
+                            <select
+                                className="border p-2 bg-white"
+                                value={newResource.departmentName}
                                 onChange={(e) =>
                                     setNewResource({
                                         ...newResource,
-                                        departmentId: Number(e.target.value),
+                                        departmentName: e.target.value,
                                     })
                                 }
-                            />
+                            >
+                                <option value="" disabled>
+                                    Select Department
+                                </option>
+                                {departments.map((department) => (
+                                    <option key={department} value={department}>
+                                        {department}
+                                    </option>
+                                ))}
+                            </select>
 
                             {/* Floor */}
                             <input
-                                type="number"
-                                placeholder="Floor ID"
+                                type="text"
+                                placeholder="Floor Name"
                                 className="border p-2"
-                                value={newResource.floorId}
+                                value={newResource.floorName}
                                 onChange={(e) =>
                                     setNewResource({
                                         ...newResource,
-                                        floorId: Number(e.target.value),
+                                        floorName: e.target.value,
                                     })
                                 }
                             />
@@ -243,7 +298,6 @@ const Resources = () => {
                         </button>
                     </div>
                 </RoleBased>
-            </div>
            
             {/* Resource List */}
             <div className="grid gap-4">
@@ -260,8 +314,15 @@ const Resources = () => {
                                 {r.name}
                             </Link>
                             <p>Type: {r.type}</p>
+                            <p>Department: {r.departmentName}</p>
+                            <p>Floor: {r.floorName}</p>
                             <p>Capacity: {r.capacity}</p>
-                            <p>Features: {r.features.join(', ')}</p>
+                            <p>
+                                Features:{' '}
+                                {Array.isArray(r.features)
+                                    ? r.features.join(', ')
+                                    : ''}
+                            </p>
                         </div>
 
                         <RoleBased roles={['SYSTEM_ADMIN']}>

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { register } from "../services/authService";
+import { useEffect, useState } from "react";
+import { getDepartments, register } from "../services/authService";
 import { useNavigate } from "react-router-dom";
 
 const Register = () => {
@@ -12,7 +12,21 @@ const Register = () => {
   });
 
   const [error, setError] = useState("");
+  const [departments, setDepartments] = useState([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const res = await getDepartments();
+        setDepartments(Array.isArray(res?.data) ? res.data : []);
+      } catch (err) {
+        setError(err.response?.data?.error || "Failed to load departments");
+      }
+    };
+
+    fetchDepartments();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -62,15 +76,23 @@ const Register = () => {
           onChange={(e) => setForm({ ...form, password: e.target.value })}
         />
 
-        {/* Department */}
-        <input
-          type="text"
-          placeholder="Department Name"
-          className="w-full mb-3 p-2 border rounded"
+        {/* Department Dropdown */}
+        <select
+          className="w-full mb-3 p-2 border rounded bg-white"
+          value={form.departmentName}
           onChange={(e) =>
             setForm({ ...form, departmentName: e.target.value })
           }
-        />
+        >
+          <option value="" disabled>
+            Select Department
+          </option>
+          {departments.map((department) => (
+            <option key={department} value={department}>
+              {department}
+            </option>
+          ))}
+        </select>
 
         {/* Role Dropdown */}
         <select
