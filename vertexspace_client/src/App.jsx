@@ -9,6 +9,7 @@ import ResourceDetail from './pages/ResourceDetail';
 import Booking from './pages/Booking';
 import Buildings from './pages/Buildings';
 import Floors from './pages/Floors';
+import DeskAssignments from './pages/DeskAssignments';
 
 function App() {
     return (
@@ -70,6 +71,15 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <Floors />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/desk-assignments"
+                    element={
+                        <ProtectedRoute>
+                            <DeskAssignments />
                         </ProtectedRoute>
                     }
                 />

@@ -1,6 +1,7 @@
 import { useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import Notifications from "./Notifications";
 
 const Navbar = () => {
   const { user, logoutUser } = useContext(AuthContext);
@@ -31,6 +32,12 @@ const Navbar = () => {
             Bookings
             </Link>
 
+            {(user.roles.includes("SYSTEM_ADMIN") || user.roles.includes("DEPARTMENT_ADMIN")) && (
+              <Link to="/desk-assignments" className="hover:text-gray-300">
+                Desk Assignments
+              </Link>
+            )}
+
             {user.roles.includes("SYSTEM_ADMIN") && (
               <>
                 <Link to="/buildings" className="hover:text-gray-300">
@@ -60,6 +67,8 @@ const Navbar = () => {
 
         {user && (
           <>
+            <Notifications user={user} />
+
             <span className="text-sm">
               {user.username} ({user.roles[0]})
             </span>
