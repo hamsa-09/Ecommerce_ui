@@ -1,6 +1,10 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
+  acceptWaitlistOffer,
+  getWaitlistStatus,
+  joinWaitlist,
+  leaveWaitlist,
   createBooking,
   listMyBookings,
   listBookingsByRange,
@@ -19,6 +23,37 @@ const initialBookingForm = {
   recurrenceCount: 1,
 };
 
+const initialWaitlistForm = {
+  resourceName: "",
+  startUtc: "",
+  endUtc: "",
+};
+
+const formatUtcToIst = (utcString) =>
+  new Date(utcString).toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+
+const unwrapData = (payload) => payload?.data ?? payload;
+
+const getOfferSecondsLeft = (expiresAt) => {
+  if (!expiresAt) return 0;
+  const diff = new Date(expiresAt).getTime() - Date.now();
+  return Math.max(0, Math.floor(diff / 1000));
+};
+
+const formatOfferCountdown = (secondsLeft) => {
+  if (secondsLeft <= 60) {
+    return `${secondsLeft}s`;
+  }
+
+  const minutes = Math.floor(secondsLeft / 60);
+  const seconds = String(secondsLeft % 60).padStart(2, "0");
+  return `${minutes}m ${seconds}s`;
+};
+
 const Booking = () => {
   const location = useLocation();
   const { user } = useContext(AuthContext);
@@ -30,6 +65,11 @@ const Booking = () => {
     startUtc: "",
     endUtc: "",
   });
+  const [waitlistStatus, setWaitlistStatus] = useState(null);
+  const [waitlistContext, setWaitlistContext] = useState(null);
+  const [waitlistMessage, setWaitlistMessage] = useState({ text: "", type: "" });
+  const [offerSecondsLeft, setOfferSecondsLeft] = useState(0);
+  const [waitlistForm, setWaitlistForm] = useState(initialWaitlistForm);
 
   const [form, setForm] = useState(initialBookingForm);
 
@@ -128,6 +168,152 @@ const Booking = () => {
       setError(err.response?.data?.error || "Booking failed");
     }
   };
+
+  const buildWaitlistPayload = () => {
+    if (!waitlistForm.resourceName || !waitlistForm.startUtc || !waitlistForm.endUtc) {
+      return null;
+    }
+
+    return {
+      resourceName: waitlistForm.resourceName,
+      startUtc: new Date(waitlistForm.startUtc).toISOString(),
+      endUtc: new Date(waitlistForm.endUtc).toISOString(),
+    };
+  };
+
+  const fetchWaitlistStatus = async (contextPayload) => {
+    try {
+      const res = await getWaitlistStatus(
+        contextPayload.resourceName,
+        contextPayload.startUtc,
+        contextPayload.endUtc
+      );
+      const statusData = unwrapData(res);
+      setWaitlistStatus(statusData || null);
+      return statusData;
+    } catch {
+      setWaitlistStatus(null);
+      return null;
+    }
+  };
+
+  const handleJoinWaitlist = async () => {
+    const payload = buildWaitlistPayload();
+    if (!payload) {
+      setWaitlistMessage({
+        text: "Select resource, start and end time to join waitlist",
+        type: "error",
+      });
+      return;
+    }
+
+    try {
+      setWaitlistMessage({ text: "", type: "" });
+      await joinWaitlist(payload);
+      setWaitlistContext(payload);
+      await fetchWaitlistStatus(payload);
+      setWaitlistMessage({ text: "Joined waitlist successfully", type: "success" });
+    } catch (err) {
+      setWaitlistMessage({
+        text: err.response?.data?.error || "Failed to join waitlist",
+        type: "error",
+      });
+    }
+  };
+
+  const handleCheckWaitlistStatus = async () => {
+    const payload = buildWaitlistPayload();
+    if (!payload) {
+      setWaitlistMessage({
+        text: "Select resource, start and end time to check waitlist status",
+        type: "error",
+      });
+      return;
+    }
+
+    setWaitlistContext(payload);
+    const statusData = await fetchWaitlistStatus(payload);
+
+    if (!statusData) {
+      setWaitlistMessage({ text: "No waitlist entry found", type: "error" });
+      return;
+    }
+
+    setWaitlistMessage({ text: "Waitlist status updated", type: "success" });
+  };
+
+  const handleLeaveWaitlist = async () => {
+    if (!waitlistStatus?.id) return;
+
+    try {
+      setWaitlistMessage({ text: "", type: "" });
+      await leaveWaitlist(waitlistStatus.id);
+      setWaitlistStatus(null);
+      setWaitlistContext(null);
+      setOfferSecondsLeft(0);
+      setWaitlistMessage({ text: "Left waitlist successfully", type: "success" });
+    } catch (err) {
+      setWaitlistMessage({
+        text: err.response?.data?.error || "Failed to leave waitlist",
+        type: "error",
+      });
+    }
+  };
+
+  const handleAcceptOffer = async () => {
+    if (!waitlistStatus?.id) return;
+
+    try {
+      setWaitlistMessage({ text: "", type: "" });
+      const res = await acceptWaitlistOffer(waitlistStatus.id);
+      const resultMessage = unwrapData(res);
+      setWaitlistMessage({
+        text:
+          typeof resultMessage === "string"
+            ? resultMessage
+            : "Offer accepted. Booking confirmed.",
+        type: "success",
+      });
+      setWaitlistStatus(null);
+      setOfferSecondsLeft(0);
+      fetchBookings();
+    } catch (err) {
+      setWaitlistMessage({
+        text: err.response?.data?.error || "Failed to accept offer",
+        type: "error",
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!waitlistContext) return;
+
+    const interval = setInterval(() => {
+      fetchWaitlistStatus(waitlistContext);
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [waitlistContext]);
+
+  useEffect(() => {
+    if (waitlistStatus?.offerStatus !== "OFFERED" || !waitlistStatus.offerExpiresAt) {
+      setOfferSecondsLeft(0);
+      return;
+    }
+
+    setOfferSecondsLeft(getOfferSecondsLeft(waitlistStatus.offerExpiresAt));
+    const timer = setInterval(() => {
+      const seconds = getOfferSecondsLeft(waitlistStatus.offerExpiresAt);
+      setOfferSecondsLeft(seconds);
+
+      if (seconds <= 0) {
+        setWaitlistStatus(null);
+        setWaitlistMessage({ text: "Offer expired", type: "error" });
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [waitlistStatus?.offerStatus, waitlistStatus?.offerExpiresAt]);
 
   const handleCancel = async (id) => {
     try {
@@ -250,8 +436,8 @@ const Booking = () => {
             >
               <div>
                 <p><b>Resource:</b> {b.resourceName}</p>
-                <p><b>Start:</b> {new Date(b.startUtc).toLocaleString()}</p>
-                <p><b>End:</b> {new Date(b.endUtc).toLocaleString()}</p>
+                <p><b>Start (IST):</b> {formatUtcToIst(b.startUtc)}</p>
+                <p><b>End (IST):</b> {formatUtcToIst(b.endUtc)}</p>
                 <p><b>Status:</b> {b.status}</p>
               </div>
 
@@ -364,6 +550,106 @@ const Booking = () => {
         >
           Create Booking
         </button>
+      </div>
+
+      <div className="border p-4 rounded mb-8 bg-gray-50">
+        <h2 className="text-lg font-bold mb-3">Waitlist</h2>
+
+        {waitlistMessage.text && (
+          <p
+            className={`mb-3 font-medium ${
+              waitlistMessage.type === "success" ? "text-green-600" : "text-red-600"
+            }`}
+          >
+            {waitlistMessage.text}
+          </p>
+        )}
+
+        <p className="text-sm text-gray-700 mb-3">
+          Waitlist works for selected resource + selected start/end slot.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+          <select
+            className="border p-2 bg-white"
+            value={waitlistForm.resourceName}
+            onChange={(e) =>
+              setWaitlistForm({ ...waitlistForm, resourceName: e.target.value })
+            }
+          >
+            <option value="">Select Resource</option>
+            {resources.map((resource) => (
+              <option key={resource.id} value={resource.name}>
+                {resource.name}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="datetime-local"
+            className="border p-2"
+            value={waitlistForm.startUtc}
+            onChange={(e) =>
+              setWaitlistForm({ ...waitlistForm, startUtc: e.target.value })
+            }
+          />
+
+          <input
+            type="datetime-local"
+            className="border p-2"
+            value={waitlistForm.endUtc}
+            onChange={(e) =>
+              setWaitlistForm({ ...waitlistForm, endUtc: e.target.value })
+            }
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            onClick={handleJoinWaitlist}
+            className="bg-purple-600 text-white px-4 py-2 rounded"
+          >
+            Join Waitlist
+          </button>
+          <button
+            onClick={handleCheckWaitlistStatus}
+            className="bg-blue-600 text-white px-4 py-2 rounded"
+          >
+            Check Status
+          </button>
+          {waitlistStatus?.id && (
+            <button
+              onClick={handleLeaveWaitlist}
+              className="bg-red-500 text-white px-4 py-2 rounded"
+            >
+              Leave Waitlist
+            </button>
+          )}
+        </div>
+
+        {waitlistStatus && (
+          <div className="border rounded p-3 bg-white">
+            <p><b>Offer Status:</b> {waitlistStatus.offerStatus ?? "WAITLIST"}</p>
+            <p><b>Start (IST):</b> {formatUtcToIst(waitlistStatus.startUtc)}</p>
+            <p><b>End (IST):</b> {formatUtcToIst(waitlistStatus.endUtc)}</p>
+
+            {waitlistStatus.offerStatus === "OFFERED" && waitlistStatus.offerExpiresAt && (
+              <>
+                <p><b>Offer Expires (IST):</b> {formatUtcToIst(waitlistStatus.offerExpiresAt)}</p>
+                <p className="font-semibold text-orange-600 mb-3">
+                  Time Left: {formatOfferCountdown(offerSecondsLeft)}
+                </p>
+
+                <button
+                  onClick={handleAcceptOffer}
+                  className="bg-green-600 text-white px-4 py-2 rounded"
+                >
+                  Accept Offer
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* My Bookings */}
