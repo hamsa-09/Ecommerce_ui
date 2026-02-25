@@ -1,4 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   createBooking,
   listMyBookings,
@@ -18,7 +19,8 @@ const initialBookingForm = {
   recurrenceCount: 1,
 };
 
-const BookingPage = () => {
+const Booking = () => {
+  const location = useLocation();
   const { user } = useContext(AuthContext);
   const [resources, setResources] = useState([]);
   const [currentUserBookings, setCurrentUserBookings] = useState([]);
@@ -35,6 +37,25 @@ const BookingPage = () => {
     fetchResources();
     fetchBookings();
   }, []);
+
+  useEffect(() => {
+    const prefillBooking = location.state?.prefillBooking;
+    if (prefillBooking) {
+      setForm({
+        ...initialBookingForm,
+        ...prefillBooking,
+        resourceId: prefillBooking.resourceId ?? "",
+        startUtc: prefillBooking.startUtc ?? "",
+        endUtc: prefillBooking.endUtc ?? "",
+        recurring: Boolean(prefillBooking.recurring),
+        recurrenceType: prefillBooking.recurrenceType || "DAILY",
+        recurrenceCount:
+          prefillBooking.recurrenceCount == null
+            ? 1
+            : Number(prefillBooking.recurrenceCount),
+      });
+    }
+  }, [location.state]);
 
   const isAdminRole =
     user?.roles?.includes("SYSTEM_ADMIN") ||
@@ -262,7 +283,7 @@ const BookingPage = () => {
         {/* Resource */}
         <select
           className="border p-2 w-full mb-3"
-          value={form.resourceId}
+          value={form.resourceId ?? ""}
           onChange={(e) =>
             setForm({ ...form, resourceId: e.target.value })
           }
@@ -279,6 +300,7 @@ const BookingPage = () => {
         <input
           type="datetime-local"
           className="border p-2 w-full mb-3"
+          value={form.startUtc ?? ""}
           onChange={(e) =>
             setForm({ ...form, startUtc: e.target.value })
           }
@@ -288,6 +310,7 @@ const BookingPage = () => {
         <input
           type="datetime-local"
           className="border p-2 w-full mb-3"
+          value={form.endUtc ?? ""}
           onChange={(e) =>
             setForm({ ...form, endUtc: e.target.value })
           }
@@ -297,7 +320,7 @@ const BookingPage = () => {
         <label className="flex items-center gap-2 mb-3">
           <input
             type="checkbox"
-            checked={form.recurring}
+            checked={Boolean(form.recurring)}
             onChange={(e) =>
               setForm({ ...form, recurring: e.target.checked })
             }
@@ -309,7 +332,7 @@ const BookingPage = () => {
           <>
             <select
               className="border p-2 w-full mb-3"
-              value={form.recurrenceType}
+              value={form.recurrenceType ?? "DAILY"}
               onChange={(e) =>
                 setForm({ ...form, recurrenceType: e.target.value })
               }
@@ -322,13 +345,15 @@ const BookingPage = () => {
               type="number"
               min="1"
               className="border p-2 w-full mb-3"
-              value={form.recurrenceCount}
-              onChange={(e) =>
+              value={form.recurrenceCount ?? 1}
+              onChange={(e) => {
+                const nextValue = e.target.value;
                 setForm({
                   ...form,
-                  recurrenceCount: Number(e.target.value),
-                })
-              }
+                  recurrenceCount:
+                    nextValue === "" ? 1 : Number(nextValue),
+                });
+              }}
             />
           </>
         )}
@@ -349,7 +374,7 @@ const BookingPage = () => {
           <input
             type="datetime-local"
             className="border p-2"
-            value={rangeFilter.startUtc}
+            value={rangeFilter.startUtc ?? ""}
             onChange={(e) =>
               setRangeFilter({ ...rangeFilter, startUtc: e.target.value })
             }
@@ -358,7 +383,7 @@ const BookingPage = () => {
           <input
             type="datetime-local"
             className="border p-2"
-            value={rangeFilter.endUtc}
+            value={rangeFilter.endUtc ?? ""}
             onChange={(e) =>
               setRangeFilter({ ...rangeFilter, endUtc: e.target.value })
             }
@@ -394,4 +419,4 @@ const BookingPage = () => {
   );
 };
 
-export default BookingPage;
+export default Booking;

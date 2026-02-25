@@ -23,3 +23,23 @@ export const updateResource = async (id, data) => {
 export const deleteResource = async (id) => {
   await axiosInstance.delete(`/resources/${id}`);
 };
+
+export const createBuilding = async (data) => {
+  const response = await axiosInstance.post("/resources/buildings", data);
+  return response.data;
+};
+
+export const getBuildings = async () => {
+  const response = await axiosInstance.get("/resources/buildings");
+  return response.data;
+};
+
+export const createFloor = async (data) => {
+  const response = await axiosInstance.post("/resources/floors", data);
+  return response.data;
+};
+
+export const getFloors = async () => {
+  const response = await axiosInstance.get("/resources/floors");
+  return response.data;
+};

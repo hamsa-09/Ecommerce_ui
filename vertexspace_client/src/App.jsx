@@ -6,7 +6,9 @@ import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import Resources from './pages/Resources';
 import ResourceDetail from './pages/ResourceDetail';
-import BookingPage from './pages/BookingPage';
+import Booking from './pages/Booking';
+import Buildings from './pages/Buildings';
+import Floors from './pages/Floors';
 
 function App() {
     return (
@@ -18,7 +20,7 @@ function App() {
                 <Route path="/register" element={<Register />} />
 
                 <Route
-                    path="/"
+                    path="/dashboard"
                     element={
                         <ProtectedRoute>
                             <Dashboard />
@@ -49,7 +51,25 @@ function App() {
                     path="/bookings"
                     element={
                         <ProtectedRoute>
-                            <BookingPage />
+                            <Booking />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/buildings"
+                    element={
+                        <ProtectedRoute>
+                            <Buildings />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/floors"
+                    element={
+                        <ProtectedRoute>
+                            <Floors />
                         </ProtectedRoute>
                     }
                 />

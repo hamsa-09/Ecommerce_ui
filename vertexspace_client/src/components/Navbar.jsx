@@ -30,6 +30,17 @@ const Navbar = () => {
             <Link to="/bookings" className="hover:text-gray-300">
             Bookings
             </Link>
+
+            {user.roles.includes("SYSTEM_ADMIN") && (
+              <>
+                <Link to="/buildings" className="hover:text-gray-300">
+                  Buildings
+                </Link>
+                <Link to="/floors" className="hover:text-gray-300">
+                  Floors
+                </Link>
+              </>
+            )}
           </>
         )}
       </div>
