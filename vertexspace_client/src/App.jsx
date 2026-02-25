@@ -6,12 +6,14 @@ import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import Resources from './pages/Resources';
 import ResourceDetail from './pages/ResourceDetail';
+import BookingPage from './pages/BookingPage';
 
 function App() {
     return (
         <Router>
             <Navbar />
             <Routes>
+
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
 
@@ -23,6 +25,7 @@ function App() {
                         </ProtectedRoute>
                     }
                 />
+
                 <Route
                     path="/resources"
                     element={
@@ -40,6 +43,17 @@ function App() {
                         </ProtectedRoute>
                     }
                 />
+
+                {/* ✅ NEW BOOKINGS ROUTE */}
+                <Route
+                    path="/bookings"
+                    element={
+                        <ProtectedRoute>
+                            <BookingPage />
+                        </ProtectedRoute>
+                    }
+                />
+
             </Routes>
         </Router>
     );
